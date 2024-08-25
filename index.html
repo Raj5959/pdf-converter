@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Questions Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        #questions {
+            margin-top: 20px;
+        }
+        .question {
+            margin-bottom: 15px;
+        }
+        .options {
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Convert PDF to Questions</h1>
+    <form id="uploadForm">
+        <input type="file" id="pdfFile" accept="application/pdf" required />
+        <button type="submit">OK</button>
+    </form>
+
+    <div id="questions"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const file = document.getElementById('pdfFile').files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function() {
+                    const typedarray = new Uint8Array(this.result);
+                    pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+                        let textContent = '';
+                        let pagesPromises = [];
+
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            pagesPromises.push(
+                                pdf.getPage(i).then(page => {
+                                    return page.getTextContent().then(text => {
+                                        text.items.forEach(item => {
+                                            textContent += item.str + ' ';
+                                        });
+                                    });
+                                })
+                            );
+                        }
+
+                        Promise.all(pagesPromises).then(() => {
+                            processPDFText(textContent);
+                        });
+                    });
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+
+        function processPDFText(text) {
+            const questionsDiv = document.getElementById('questions');
+            const lines = text.split(/\r?\n/);
+            let currentQuestion = null;
+
+            lines.forEach(line => {
+                line = line.trim();
+                if (line.match(/^\d+\./)) { // Check if line starts with a number (question)
+                    currentQuestion = document.createElement('div');
+                    currentQuestion.classList.add('question');
+                    currentQuestion.innerText = line;
+                    questionsDiv.appendChild(currentQuestion);
+                } else if (line.match(/^[a-d]\)/i) && currentQuestion) { // Check if line starts with a letter followed by a bracket (option)
+                    const option = document.createElement('div');
+                    option.classList.add('options');
+                    option.innerText = line;
+                    currentQuestion.appendChild(option);
+                }
+            });
+        }
+    </script>
+
+</body>
+</html>
